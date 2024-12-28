@@ -1,4 +1,5 @@
 import { createCallerFactory, createTRPCRouter, publicProcedure } from "@/server/api/trpc";
+import { twitterRouter } from "./routers/twitter";
 
 /**
  * This is the primary router for your server.
@@ -9,6 +10,7 @@ export const appRouter = createTRPCRouter({
   hello: publicProcedure.query(() => {
     return "Hello World";
   }),
+  twitter: twitterRouter,
 });
 
 // export type definition of API

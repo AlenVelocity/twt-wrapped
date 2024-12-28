@@ -10,6 +10,13 @@ datasource db {
     url      = env("DATABASE_URL")
 }
 
-model Placeholder {
-    id Int @id @default(autoincrement())
+model TwitterStats {
+    id        String   @id @default(cuid())
+    username  String
+    year      Int
+    stats     Json
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([username, year])
 }
