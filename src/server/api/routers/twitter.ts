@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { createTRPCRouter, publicProcedure } from "../trpc";
 import { Scraper, SearchMode } from "@the-convocation/twitter-scraper";
-import { emit } from "@/app/api/progress/route";
 import { DailyTweets, TwitterStatsData } from "@/types/twitter";
 
 const statsSchema = z.object({
@@ -89,6 +88,25 @@ const generateDailyTweets = (tweets: any[]): DailyTweets[] => {
     .sort((a, b) => a.date.localeCompare(b.date));
 };
 
+// Helper function to update progress
+async function updateProgress(username: string, progress: number) {
+  try {
+    const baseUrl = process.env.VERCEL_URL 
+      ? `https://${process.env.VERCEL_URL}`
+      : process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+
+    await fetch(`${baseUrl}/api/progress`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ username, progress }),
+    });
+  } catch (error) {
+    console.error('Error updating progress:', error);
+  }
+}
+
 export const twitterRouter = createTRPCRouter({
   checkStats: publicProcedure
     .input(z.object({ username: z.string() }))
@@ -126,7 +144,7 @@ export const twitterRouter = createTRPCRouter({
         const user = await scraper.getProfile(input.username);
         if (!user) {
           console.log("User not found");
-          emit(input.username, 100);
+          await updateProgress(input.username, 100);
           return null;
         }
 
@@ -158,21 +176,21 @@ export const twitterRouter = createTRPCRouter({
             });
             count++;
             
-            // Emit progress update (assuming we'll fetch around 100 tweets)
-            emit(input.username, Math.min(Math.floor((count / 100) * 100), 99));
+            // Update progress (assuming we'll fetch around 100 tweets)
+            await updateProgress(input.username, Math.min(Math.floor((count / 100) * 100), 99));
           }
           
           console.log("Final tweets count:", tweets.length);
         } catch (e) {
           console.error("Error fetching tweets:", e);
-          emit(input.username, 100);
+          await updateProgress(input.username, 100);
           return null;
         }
 
         // If no tweets found, return empty stats
         if (!tweets.length) {
           console.log("No tweets found");
-          emit(input.username, 100);
+          await updateProgress(input.username, 100);
           return emptyStats(input.username);
         }
         
@@ -223,8 +241,8 @@ export const twitterRouter = createTRPCRouter({
           },
         });
 
-        // Emit 100% progress
-        emit(input.username, 100);
+        // Update final progress
+        await updateProgress(input.username, 100);
 
         console.log("Final stats:", stats);
         return {
@@ -233,7 +251,7 @@ export const twitterRouter = createTRPCRouter({
         };
       } catch (error) {
         console.error("Error fetching Twitter stats:", error);
-        emit(input.username, 100);
+        await updateProgress(input.username, 100);
         return null;
       }
     }),

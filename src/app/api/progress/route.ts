@@ -6,6 +6,28 @@ const progressStore = new Map<string, number>();
 // Store cleanup functions
 const cleanupStore = new Map<string, () => void>();
 
+// Internal function to update progress
+function updateProgress(username: string, progress: number) {
+  progressStore.set(username, progress);
+  
+  // If progress is 100 or there was an error (progress reset to 0),
+  // clean up after a short delay
+  if (progress === 100 || progress === 0) {
+    setTimeout(() => {
+      const cleanup = cleanupStore.get(username);
+      if (cleanup) {
+        cleanup();
+      }
+    }, 2000);
+  }
+}
+
+// Export progress update function for internal use
+export const config = {
+  runtime: 'edge',
+};
+
+// Handle SSE requests
 export async function GET(req: NextRequest) {
   const username = req.nextUrl.searchParams.get('username');
   if (!username) {
@@ -63,19 +85,19 @@ export async function GET(req: NextRequest) {
   });
 }
 
-export function emit(username: string, progress: number) {
-  progressStore.set(username, progress);
-  
-  // If progress is 100 or there was an error (progress reset to 0),
-  // clean up after a short delay
-  if (progress === 100 || progress === 0) {
-    setTimeout(() => {
-      const cleanup = cleanupStore.get(username);
-      if (cleanup) {
-        cleanup();
-      }
-    }, 2000);
-  }
-}
+// Handle POST requests to update progress
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { username, progress } = body;
 
-export const runtime = 'edge'; 
+    if (!username || typeof progress !== 'number') {
+      return new Response('Invalid request body', { status: 400 });
+    }
+
+    updateProgress(username, progress);
+    return new Response('OK');
+  } catch (error) {
+    return new Response('Invalid request', { status: 400 });
+  }
+} 
